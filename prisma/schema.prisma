@@ -1,0 +1,215 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  TENANT
+  OWNER
+}
+
+enum SubscriptionPlan {
+  NONE
+  STANDARD
+  PREMIUM
+}
+
+enum PropertyType {
+  ROOM
+  APARTMENT
+  HOUSE
+}
+
+enum PropertyStatus {
+  AVAILABLE
+  UNAVAILABLE
+}
+
+enum BookingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+}
+
+enum TransactionType {
+  BOOKING
+  SUBSCRIPTION
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+}
+
+enum DocumentType {
+  ID_CARD
+  PASSPORT
+  DRIVERS_LICENSE
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String
+  role          UserRole
+  firstName     String
+  lastName      String
+  phoneNumber   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  isVerified    Boolean   @default(false)
+  subscription  SubscriptionPlan @default(NONE)
+
+  // Relations
+  properties         Property[]
+  bookings          Booking[]
+  identityDocs      IdentityVerification[]
+  subscriptionInfo  Subscription?
+  verifiedDocs      IdentityVerification[] @relation("Verifier")
+
+  @@index([email])
+}
+
+model Property {
+  id              String    @id @default(uuid())
+  ownerId         String
+  title           String
+  description     String
+  address         String
+  city            String
+  coordinates     Json      // { latitude: number, longitude: number }
+  price           Decimal
+  weeklyDiscount  Decimal?
+  monthlyDiscount Decimal?
+  propertyType    PropertyType
+  bedrooms        Int
+  bathrooms       Int
+  maxOccupancy    Int
+  amenities       Json      // Array of amenity strings
+  status          PropertyStatus @default(AVAILABLE)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  owner           User @relation(fields: [ownerId], references: [id])
+  bookings        Booking[]
+  images          PropertyImage[]
+
+  @@index([ownerId])
+  @@index([city])
+  @@index([status])
+}
+
+model Booking {
+  id            String    @id @default(uuid())
+  propertyId    String
+  tenantId      String
+  startDate     DateTime
+  endDate       DateTime
+  totalPrice    Decimal
+  status        BookingStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  property      Property @relation(fields: [propertyId], references: [id])
+  tenant        User @relation(fields: [tenantId], references: [id])
+  transactions  Transaction[]
+
+  @@index([propertyId])
+  @@index([tenantId])
+  @@index([startDate])
+  @@index([endDate])
+}
+
+model Transaction {
+  id              String    @id @default(uuid())
+  bookingId       String
+  amount          Decimal
+  currency        String    @default("USD")
+  stripePaymentId String
+  status          TransactionStatus
+  type            TransactionType
+  createdAt       DateTime @default(now())
+
+  // Relations
+  booking         Booking @relation(fields: [bookingId], references: [id])
+
+  @@index([bookingId])
+  @@index([stripePaymentId])
+}
+
+model IdentityVerification {
+  id            String    @id @default(uuid())
+  userId        String
+  documentType  DocumentType
+  documentUrl   String
+  status        VerificationStatus @default(PENDING)
+  submittedAt   DateTime @default(now())
+  verifiedAt    DateTime?
+  verifiedBy    String?
+
+  // Relations
+  user          User @relation(fields: [userId], references: [id])
+  verifier      User? @relation("Verifier", fields: [verifiedBy], references: [id])
+
+  @@index([userId])
+}
+
+model PropertyImage {
+  id          String    @id @default(uuid())
+  propertyId  String
+  url         String
+  isPrimary   Boolean   @default(false)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  property    Property @relation(fields: [propertyId], references: [id])
+
+  @@index([propertyId])
+}
+
+model Subscription {
+  id                  String    @id @default(uuid())
+  userId              String    @unique
+  plan                SubscriptionPlan
+  status              SubscriptionStatus
+  stripeSubscriptionId String
+  startDate           DateTime
+  endDate             DateTime
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  // Relations
+  user                User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([stripeSubscriptionId])
+} 
