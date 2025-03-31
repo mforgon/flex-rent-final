@@ -140,3 +140,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom utilities */
+.bg-coral-500 {
+  background-color: hsl(var(--coral));
+  color: hsl(var(--coral-foreground));
+}
+
+.text-coral-500 {
+  color: hsl(var(--coral));
+}
+
+.border-coral-500 {
+  border-color: hsl(var(--coral));
+}
